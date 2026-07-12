@@ -291,8 +291,12 @@ try {
   // Initialize state based on available layers
   const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, accOffsetX: 0, accOffsetY: 0, accRotation: 0, accScale: 1, accColor: '#ffffff' };
   availableLayers.forEach(layer => {
-    // Select first image by default if available, otherwise empty
-    state[layer.id] = layer.images.length > 0 ? layer.images[0] : "";
+    if (layer.id.includes('ACCESORIO')) {
+      state[layer.id] = [];
+    } else {
+      // Select first image by default if available, otherwise empty
+      state[layer.id] = layer.images.length > 0 ? layer.images[0] : "";
+    }
   });
 
   const canvas = document.getElementById('avatar-canvas');
@@ -363,8 +367,14 @@ try {
     for (const layer of availableLayers) {
       if (layer.id.includes('FONDO') && state.bgMode !== 'image') continue;
       
-      const imgPath = state[layer.id];
-      if (imgPath) {
+      const val = state[layer.id];
+      if (!val) continue;
+      
+      const imgPaths = Array.isArray(val) ? val : [val];
+      
+      for (const imgPath of imgPaths) {
+        if (!imgPath) continue;
+        
         if (!imageCache[imgPath]) {
           await new Promise((resolve) => {
             const img = new Image();
@@ -507,10 +517,20 @@ try {
     optionItems.forEach(item => {
       const layer = item.dataset.layer;
       const img = item.dataset.image;
-      if (state[layer] === img) {
-        item.classList.add('selected');
+      if (layer.includes('ACCESORIO')) {
+        if (img === "") {
+          if (state[layer].length === 0) item.classList.add('selected');
+          else item.classList.remove('selected');
+        } else {
+          if (state[layer].includes(img)) item.classList.add('selected');
+          else item.classList.remove('selected');
+        }
       } else {
-        item.classList.remove('selected');
+        if (state[layer] === img) {
+          item.classList.add('selected');
+        } else {
+          item.classList.remove('selected');
+        }
       }
     });
   };
@@ -521,7 +541,20 @@ try {
     item.addEventListener('click', () => {
       const layer = item.dataset.layer;
       const img = item.dataset.image;
-      state[layer] = img;
+      if (layer.includes('ACCESORIO')) {
+        if (img === "") {
+          state[layer] = [];
+        } else {
+          const index = state[layer].indexOf(img);
+          if (index > -1) {
+            state[layer].splice(index, 1);
+          } else {
+            state[layer].push(img);
+          }
+        }
+      } else {
+        state[layer] = img;
+      }
       updateVisualSelection();
       drawAvatar();
     });
