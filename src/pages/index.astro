@@ -449,62 +449,22 @@ try {
               
               offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
               
-              const isWhiteTarget = targetHex.toLowerCase() === '#ffffff';
-              const useGradient = isWhiteTarget && state.baseMode === 'gradient';
-              
               const tRgb = hexToRgb(targetHex);
-              let newRgb = null;
-              if (!useGradient) {
-                const targetColor = isWhiteTarget ? state.baseColor : state.accColor;
-                newRgb = hexToRgb(targetColor);
-              }
+              const newRgb = hexToRgb(state.accColor);
               
               const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
               const data = imgData.data;
-              const tolerance = isWhiteTarget ? 0 : 45;
-              
-              // Calculate Y boundaries if base gradient is used on white target
-              let minY = 0;
-              let maxY = offCanvas.height;
-              if (useGradient) {
-                findMinY: for (let y = 0; y < offCanvas.height; y++) {
-                  for (let x = 0; x < offCanvas.width; x++) {
-                    if (data[(y * offCanvas.width + x) * 4 + 3] > 0) {
-                      minY = y;
-                      break findMinY;
-                    }
-                  }
-                }
-                findMaxY: for (let y = offCanvas.height - 1; y >= 0; y--) {
-                  for (let x = 0; x < offCanvas.width; x++) {
-                    if (data[(y * offCanvas.width + x) * 4 + 3] > 0) {
-                      maxY = y;
-                      break findMaxY;
-                    }
-                  }
-                }
-              }
+              const tolerance = 45;
 
-              for (let y = 0; y < offCanvas.height; y++) {
-                for (let x = 0; x < offCanvas.width; x++) {
-                  const idx = (y * offCanvas.width + x) * 4;
-                  if (data[idx+3] > 0) {
-                    const dr = data[idx] - tRgb.r;
-                    const dg = data[idx+1] - tRgb.g;
-                    const db = data[idx+2] - tRgb.b;
-                    if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
-                      if (useGradient) {
-                        const factor = (y - minY) / (maxY - minY || 1);
-                        const interp = interpolateColor(state.baseColor, state.baseColor2, factor);
-                        data[idx] = interp.r;
-                        data[idx+1] = interp.g;
-                        data[idx+2] = interp.b;
-                      } else {
-                        data[idx] = newRgb.r;
-                        data[idx+1] = newRgb.g;
-                        data[idx+2] = newRgb.b;
-                      }
-                    }
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i+3] > 0) {
+                  const dr = data[i] - tRgb.r;
+                  const dg = data[i+1] - tRgb.g;
+                  const db = data[i+2] - tRgb.b;
+                  if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
+                    data[i] = newRgb.r;
+                    data[i+1] = newRgb.g;
+                    data[i+2] = newRgb.b;
                   }
                 }
               }
