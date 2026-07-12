@@ -308,6 +308,92 @@ try {
     }
   });
 
+  const getSelectedAcc = () => {
+    const layerId = availableLayers.find(l => l.id.includes('ACCESORIO'))?.id;
+    const activeAccs = state[layerId] || [];
+    if (state.selectedAccIdx >= 0 && state.selectedAccIdx < activeAccs.length) {
+      return activeAccs[state.selectedAccIdx];
+    }
+    return null;
+  };
+
+  const renderActiveAccList = () => {
+    const container = document.getElementById('active-acc-container');
+    const listEl = document.getElementById('active-acc-list');
+    const controlsEl = document.getElementById('acc-individual-controls');
+    
+    if (!container || !listEl || !controlsEl) return;
+    
+    const layerId = availableLayers.find(l => l.id.includes('ACCESORIO'))?.id;
+    const activeAccs = state[layerId] || [];
+    
+    if (activeAccs.length === 0) {
+      container.style.display = 'none';
+      controlsEl.style.display = 'none';
+      return;
+    }
+    
+    container.style.display = 'block';
+    controlsEl.style.display = 'flex';
+    listEl.innerHTML = '';
+    
+    activeAccs.forEach((acc, idx) => {
+      const filename = acc.path.split('/').pop().split('$')[0];
+      
+      const pill = document.createElement('div');
+      pill.className = `acc-pill neo-button ${idx === state.selectedAccIdx ? 'active' : ''}`;
+      pill.style.padding = '4px 10px';
+      pill.style.fontSize = '0.9rem';
+      pill.style.display = 'inline-flex';
+      pill.style.alignItems = 'center';
+      pill.style.gap = '8px';
+      pill.style.cursor = 'pointer';
+      
+      // Neo-brutalist theme pill styling
+      pill.style.border = '2px solid var(--border)';
+      pill.style.borderRadius = '6px';
+      if (idx === state.selectedAccIdx) {
+        pill.style.background = 'var(--primary)';
+        pill.style.color = 'white';
+        pill.style.boxShadow = '2px 2px 0px var(--border)';
+      } else {
+        pill.style.background = 'white';
+        pill.style.color = 'var(--text)';
+        pill.style.boxShadow = '2px 2px 0px var(--border)';
+      }
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = filename;
+      nameSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.selectedAccIdx = idx;
+        renderActiveAccList();
+        updateColorSelection();
+        drawAvatar();
+      });
+      
+      const deleteBtn = document.createElement('span');
+      deleteBtn.textContent = '❌';
+      deleteBtn.style.fontWeight = 'bold';
+      deleteBtn.style.cursor = 'pointer';
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeAccs.splice(idx, 1);
+        if (state.selectedAccIdx >= activeAccs.length) {
+          state.selectedAccIdx = activeAccs.length - 1;
+        }
+        renderActiveAccList();
+        updateVisualSelection();
+        updateColorSelection();
+        drawAvatar();
+      });
+      
+      pill.appendChild(nameSpan);
+      pill.appendChild(deleteBtn);
+      listEl.appendChild(pill);
+    });
+  };
+
   const canvas = document.getElementById('avatar-canvas');
   const ctx = canvas.getContext('2d');
   
@@ -828,14 +914,7 @@ try {
     drawAvatar(); 
   });
 
-  const getSelectedAcc = () => {
-    const layerId = availableLayers.find(l => l.id.includes('ACCESORIO'))?.id;
-    const activeAccs = state[layerId] || [];
-    if (state.selectedAccIdx >= 0 && state.selectedAccIdx < activeAccs.length) {
-      return activeAccs[state.selectedAccIdx];
-    }
-    return null;
-  };
+
 
   const accColorInput = document.getElementById('acc-color-input');
   if (accColorInput) {
@@ -895,84 +974,6 @@ try {
       drawAvatar(); 
     } 
   });
-
-  // Inject helper script to render active accessories list
-  const renderActiveAccList = () => {
-    const container = document.getElementById('active-acc-container');
-    const listEl = document.getElementById('active-acc-list');
-    const controlsEl = document.getElementById('acc-individual-controls');
-    
-    if (!container || !listEl || !controlsEl) return;
-    
-    const layerId = availableLayers.find(l => l.id.includes('ACCESORIO'))?.id;
-    const activeAccs = state[layerId] || [];
-    
-    if (activeAccs.length === 0) {
-      container.style.display = 'none';
-      controlsEl.style.display = 'none';
-      return;
-    }
-    
-    container.style.display = 'block';
-    controlsEl.style.display = 'flex';
-    listEl.innerHTML = '';
-    
-    activeAccs.forEach((acc, idx) => {
-      const filename = acc.path.split('/').pop().split('$')[0];
-      
-      const pill = document.createElement('div');
-      pill.className = `acc-pill neo-button ${idx === state.selectedAccIdx ? 'active' : ''}`;
-      pill.style.padding = '4px 10px';
-      pill.style.fontSize = '0.9rem';
-      pill.style.display = 'inline-flex';
-      pill.style.alignItems = 'center';
-      pill.style.gap = '8px';
-      pill.style.cursor = 'pointer';
-      
-      // Neo-brutalist theme pill styling
-      pill.style.border = '2px solid var(--border)';
-      pill.style.borderRadius = '6px';
-      if (idx === state.selectedAccIdx) {
-        pill.style.background = 'var(--primary)';
-        pill.style.color = 'white';
-        pill.style.boxShadow = '2px 2px 0px var(--border)';
-      } else {
-        pill.style.background = 'white';
-        pill.style.color = 'var(--text)';
-        pill.style.boxShadow = '2px 2px 0px var(--border)';
-      }
-      
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = filename;
-      nameSpan.addEventListener('click', (e) => {
-        e.stopPropagation();
-        state.selectedAccIdx = idx;
-        renderActiveAccList();
-        updateColorSelection();
-        drawAvatar();
-      });
-      
-      const deleteBtn = document.createElement('span');
-      deleteBtn.textContent = '❌';
-      deleteBtn.style.fontWeight = 'bold';
-      deleteBtn.style.cursor = 'pointer';
-      deleteBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        activeAccs.splice(idx, 1);
-        if (state.selectedAccIdx >= activeAccs.length) {
-          state.selectedAccIdx = activeAccs.length - 1;
-        }
-        renderActiveAccList();
-        updateVisualSelection();
-        updateColorSelection();
-        drawAvatar();
-      });
-      
-      pill.appendChild(nameSpan);
-      pill.appendChild(deleteBtn);
-      listEl.appendChild(pill);
-    });
-  };
 
   renderActiveAccList();
 
