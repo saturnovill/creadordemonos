@@ -215,25 +215,34 @@ try {
               )}
               {layer.id.includes('ACCESORIO') && (
                 <div style="margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
-                  <div class="transform-controls-section" style="margin-bottom: 0;">
-                    <h3 class="color-picker-title">Ajustar Accesorio</h3>
-                    <div class="transform-controls">
-                      <button class="t-btn" id="acc-up" title="Arriba">⬆️</button>
-                      <button class="t-btn" id="acc-down" title="Abajo">⬇️</button>
-                      <button class="t-btn" id="acc-left" title="Izquierda">⬅️</button>
-                      <button class="t-btn" id="acc-right" title="Derecha">➡️</button>
-                      <button class="t-btn" id="acc-rot-left" title="Girar Izquierda">↺</button>
-                      <button class="t-btn" id="acc-rot-right" title="Girar Derecha">↻</button>
-                      <button class="t-btn" id="acc-scale-up" title="Agrandar">➕</button>
-                      <button class="t-btn" id="acc-scale-down" title="Reducir">➖</button>
-                      <button class="t-btn" id="acc-reset" title="Resetear">🔄</button>
-                    </div>
+                  <!-- Active accessories management list -->
+                  <div id="active-acc-container" style="margin-bottom: 0; display: none;">
+                    <h3 class="color-picker-title">Accesorios Activos</h3>
+                    <div id="active-acc-list" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;"></div>
                   </div>
-                  <div class="color-picker-section" style="margin-bottom: 0;">
-                    <h3 class="color-picker-title">Color de Accesorio</h3>
-                    <div class="color-picker-wrapper">
-                      <input type="color" class="neo-color-picker" id="acc-color-input" value="#ffffff" />
-                      <span class="color-value" id="acc-color-val">#ffffff</span>
+                  
+                  <!-- Controls section for the selected active accessory -->
+                  <div id="acc-individual-controls" style="display: none; flex-direction: column; gap: 1rem;">
+                    <div class="transform-controls-section" style="margin-bottom: 0;">
+                      <h3 class="color-picker-title" id="acc-adjust-title">Ajustar Accesorio</h3>
+                      <div class="transform-controls">
+                        <button class="t-btn" id="acc-up" title="Arriba">⬆️</button>
+                        <button class="t-btn" id="acc-down" title="Abajo">⬇️</button>
+                        <button class="t-btn" id="acc-left" title="Izquierda">⬅️</button>
+                        <button class="t-btn" id="acc-right" title="Derecha">➡️</button>
+                        <button class="t-btn" id="acc-rot-left" title="Girar Izquierda">↺</button>
+                        <button class="t-btn" id="acc-rot-right" title="Girar Derecha">↻</button>
+                        <button class="t-btn" id="acc-scale-up" title="Agrandar">➕</button>
+                        <button class="t-btn" id="acc-scale-down" title="Reducir">➖</button>
+                        <button class="t-btn" id="acc-reset" title="Resetear">🔄</button>
+                      </div>
+                    </div>
+                    <div class="color-picker-section" style="margin-bottom: 0;" id="acc-color-section">
+                      <h3 class="color-picker-title">Color de Accesorio</h3>
+                      <div class="color-picker-wrapper">
+                        <input type="color" class="neo-color-picker" id="acc-color-input" value="#ffffff" />
+                        <span class="color-value" id="acc-color-val">#ffffff</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -289,7 +298,7 @@ try {
   };
 
   // Initialize state based on available layers
-  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, accOffsetX: 0, accOffsetY: 0, accRotation: 0, accScale: 1, accColor: '#ffffff' };
+  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, selectedAccIdx: -1 };
   availableLayers.forEach(layer => {
     if (layer.id.includes('ACCESORIO')) {
       state[layer.id] = [];
@@ -370,9 +379,11 @@ try {
       const val = state[layer.id];
       if (!val) continue;
       
-      const imgPaths = Array.isArray(val) ? val : [val];
+      const isAcc = layer.id.includes('ACCESORIO');
+      const imgPaths = isAcc ? val.map(a => a.path) : (Array.isArray(val) ? val : [val]);
       
-      for (const imgPath of imgPaths) {
+      for (let accIdx = 0; accIdx < imgPaths.length; accIdx++) {
+        const imgPath = imgPaths[accIdx];
         if (!imgPath) continue;
         
         if (!imageCache[imgPath]) {
@@ -443,47 +454,50 @@ try {
             ctx.drawImage(imageCache[imgPath], -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
             ctx.restore();
           } else if (layer.id.includes('ACCESORIO')) {
-            ctx.save();
-            ctx.translate(canvas.width / 2 + state.accOffsetX, canvas.height / 2 + state.accOffsetY);
-            ctx.rotate(state.accRotation * Math.PI / 180);
-            ctx.scale(state.accScale, state.accScale);
-            
-            const accMatch = imgPath.match(/\$([0-9a-fA-F]{6})\./);
-            const targetHex = accMatch ? '#' + accMatch[1] : null;
-            
-            if (targetHex && state.accColor) {
-              const offCanvas = document.createElement('canvas');
-              offCanvas.width = canvas.width;
-              offCanvas.height = canvas.height;
-              const offCtx = offCanvas.getContext('2d');
+            const acc = val[accIdx];
+            if (acc) {
+              ctx.save();
+              ctx.translate(canvas.width / 2 + acc.offsetX, canvas.height / 2 + acc.offsetY);
+              ctx.rotate(acc.rotation * Math.PI / 180);
+              ctx.scale(acc.scale, acc.scale);
               
-              offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
+              const accMatch = imgPath.match(/\$([0-9a-fA-F]{6})\./);
+              const targetHex = accMatch ? '#' + accMatch[1] : null;
               
-              const tRgb = hexToRgb(targetHex);
-              const newRgb = hexToRgb(state.accColor);
-              
-              const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
-              const data = imgData.data;
-              const tolerance = 45;
+              if (targetHex && acc.color) {
+                const offCanvas = document.createElement('canvas');
+                offCanvas.width = canvas.width;
+                offCanvas.height = canvas.height;
+                const offCtx = offCanvas.getContext('2d');
+                
+                offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
+                
+                const tRgb = hexToRgb(targetHex);
+                const newRgb = hexToRgb(acc.color);
+                
+                const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+                const data = imgData.data;
+                const tolerance = 45;
 
-              for (let i = 0; i < data.length; i += 4) {
-                if (data[i+3] > 0) {
-                  const dr = data[i] - tRgb.r;
-                  const dg = data[i+1] - tRgb.g;
-                  const db = data[i+2] - tRgb.b;
-                  if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
-                    data[i] = newRgb.r;
-                    data[i+1] = newRgb.g;
-                    data[i+2] = newRgb.b;
+                for (let i = 0; i < data.length; i += 4) {
+                  if (data[i+3] > 0) {
+                    const dr = data[i] - tRgb.r;
+                    const dg = data[i+1] - tRgb.g;
+                    const db = data[i+2] - tRgb.b;
+                    if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
+                      data[i] = newRgb.r;
+                      data[i+1] = newRgb.g;
+                      data[i+2] = newRgb.b;
+                    }
                   }
                 }
+                offCtx.putImageData(imgData, 0, 0);
+                ctx.drawImage(offCanvas, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+              } else {
+                ctx.drawImage(imageCache[imgPath], -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
               }
-              offCtx.putImageData(imgData, 0, 0);
-              ctx.drawImage(offCanvas, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-            } else {
-              ctx.drawImage(imageCache[imgPath], -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+              ctx.restore();
             }
-            ctx.restore();
           } else {
             ctx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
           }
@@ -517,12 +531,16 @@ try {
     optionItems.forEach(item => {
       const layer = item.dataset.layer;
       const img = item.dataset.image;
+      if (!layer) return; // Safety check
+      
       if (layer.includes('ACCESORIO')) {
+        const activeAccs = state[layer] || [];
+        const isSelected = activeAccs.some(a => a.path === img);
         if (img === "") {
-          if (state[layer].length === 0) item.classList.add('selected');
+          if (activeAccs.length === 0) item.classList.add('selected');
           else item.classList.remove('selected');
         } else {
-          if (state[layer].includes(img)) item.classList.add('selected');
+          if (isSelected) item.classList.add('selected');
           else item.classList.remove('selected');
         }
       } else {
@@ -541,21 +559,36 @@ try {
     item.addEventListener('click', () => {
       const layer = item.dataset.layer;
       const img = item.dataset.image;
+      if (!layer) return; // Safety check
+      
       if (layer.includes('ACCESORIO')) {
         if (img === "") {
           state[layer] = [];
+          state.selectedAccIdx = -1;
         } else {
-          const index = state[layer].indexOf(img);
-          if (index > -1) {
-            state[layer].splice(index, 1);
+          const idx = state[layer].findIndex(a => a.path === img);
+          if (idx > -1) {
+            state[layer].splice(idx, 1);
+            if (state.selectedAccIdx >= state[layer].length) {
+              state.selectedAccIdx = state[layer].length - 1;
+            }
           } else {
-            state[layer].push(img);
+            state[layer].push({
+              path: img,
+              offsetX: 0,
+              offsetY: 0,
+              rotation: 0,
+              scale: 1,
+              color: '#ffffff'
+            });
+            state.selectedAccIdx = state[layer].length - 1;
           }
         }
       } else {
         state[layer] = img;
       }
       updateVisualSelection();
+      renderActiveAccList();
       drawAvatar();
     });
   });
@@ -574,8 +607,23 @@ try {
 
     const accColorInput = document.getElementById('acc-color-input');
     const accColorVal = document.getElementById('acc-color-val');
-    if (accColorInput) accColorInput.value = state.accColor;
-    if (accColorVal) accColorVal.textContent = state.accColor.toUpperCase();
+    const accColorSection = document.getElementById('acc-color-section');
+    const accAdjustTitle = document.getElementById('acc-adjust-title');
+    
+    const acc = getSelectedAcc();
+    if (acc) {
+      if (accColorInput) accColorInput.value = acc.color;
+      if (accColorVal) accColorVal.textContent = acc.color.toUpperCase();
+      
+      const accMatch = acc.path.match(/\$([0-9a-fA-F]{6})\./);
+      if (accColorSection) accColorSection.style.display = accMatch ? 'block' : 'none';
+      
+      const filename = acc.path.split('/').pop().split('$')[0];
+      if (accAdjustTitle) accAdjustTitle.textContent = `Ajustar: ${filename}`;
+    } else {
+      if (accColorSection) accColorSection.style.display = 'none';
+      if (accAdjustTitle) accAdjustTitle.textContent = `Ajustar Accesorio`;
+    }
 
     const bgColor1Input = document.getElementById('bg-color1-input');
     const bgColor1Val = document.getElementById('bg-color1-val');
@@ -780,27 +828,153 @@ try {
     drawAvatar(); 
   });
 
-  setupColorInput('acc-color-input', 'accColor');
+  const getSelectedAcc = () => {
+    const layerId = availableLayers.find(l => l.id.includes('ACCESORIO'))?.id;
+    const activeAccs = state[layerId] || [];
+    if (state.selectedAccIdx >= 0 && state.selectedAccIdx < activeAccs.length) {
+      return activeAccs[state.selectedAccIdx];
+    }
+    return null;
+  };
+
+  const accColorInput = document.getElementById('acc-color-input');
+  if (accColorInput) {
+    accColorInput.addEventListener('input', (e) => {
+      const acc = getSelectedAcc();
+      if (acc) {
+        acc.color = e.target.value;
+        updateColorSelection();
+        drawAvatar();
+      }
+    });
+  }
 
   const accMoveStep = 10;
   const accRotStep = 5;
   const accScaleStep = 0.05;
 
-  document.getElementById('acc-up')?.addEventListener('click', () => { state.accOffsetY -= accMoveStep; drawAvatar(); });
-  document.getElementById('acc-down')?.addEventListener('click', () => { state.accOffsetY += accMoveStep; drawAvatar(); });
-  document.getElementById('acc-left')?.addEventListener('click', () => { state.accOffsetX -= accMoveStep; drawAvatar(); });
-  document.getElementById('acc-right')?.addEventListener('click', () => { state.accOffsetX += accMoveStep; drawAvatar(); });
-  document.getElementById('acc-rot-left')?.addEventListener('click', () => { state.accRotation -= accRotStep; drawAvatar(); });
-  document.getElementById('acc-rot-right')?.addEventListener('click', () => { state.accRotation += accRotStep; drawAvatar(); });
-  document.getElementById('acc-scale-up')?.addEventListener('click', () => { state.accScale += accScaleStep; drawAvatar(); });
-  document.getElementById('acc-scale-down')?.addEventListener('click', () => { state.accScale = Math.max(0.1, state.accScale - accScaleStep); drawAvatar(); });
-  document.getElementById('acc-reset')?.addEventListener('click', () => { 
-    state.accOffsetX = 0; 
-    state.accOffsetY = 0; 
-    state.accRotation = 0; 
-    state.accScale = 1;
-    drawAvatar(); 
+  document.getElementById('acc-up')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { acc.offsetY -= accMoveStep; drawAvatar(); } 
   });
+  document.getElementById('acc-down')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { acc.offsetY += accMoveStep; drawAvatar(); } 
+  });
+  document.getElementById('acc-left')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { acc.offsetX -= accMoveStep; drawAvatar(); } 
+  });
+  document.getElementById('acc-right')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { acc.offsetX += accMoveStep; drawAvatar(); } 
+  });
+  document.getElementById('acc-rot-left')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { acc.rotation -= accRotStep; drawAvatar(); } 
+  });
+  document.getElementById('acc-rot-right')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { acc.rotation += accRotStep; drawAvatar(); } 
+  });
+  document.getElementById('acc-scale-up')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { acc.scale += accScaleStep; drawAvatar(); } 
+  });
+  document.getElementById('acc-scale-down')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { acc.scale = Math.max(0.1, acc.scale - accScaleStep); drawAvatar(); } 
+  });
+  document.getElementById('acc-reset')?.addEventListener('click', () => { 
+    const acc = getSelectedAcc(); 
+    if (acc) { 
+      acc.offsetX = 0; 
+      acc.offsetY = 0; 
+      acc.rotation = 0; 
+      acc.scale = 1; 
+      drawAvatar(); 
+    } 
+  });
+
+  // Inject helper script to render active accessories list
+  const renderActiveAccList = () => {
+    const container = document.getElementById('active-acc-container');
+    const listEl = document.getElementById('active-acc-list');
+    const controlsEl = document.getElementById('acc-individual-controls');
+    
+    if (!container || !listEl || !controlsEl) return;
+    
+    const layerId = availableLayers.find(l => l.id.includes('ACCESORIO'))?.id;
+    const activeAccs = state[layerId] || [];
+    
+    if (activeAccs.length === 0) {
+      container.style.display = 'none';
+      controlsEl.style.display = 'none';
+      return;
+    }
+    
+    container.style.display = 'block';
+    controlsEl.style.display = 'flex';
+    listEl.innerHTML = '';
+    
+    activeAccs.forEach((acc, idx) => {
+      const filename = acc.path.split('/').pop().split('$')[0];
+      
+      const pill = document.createElement('div');
+      pill.className = `acc-pill neo-button ${idx === state.selectedAccIdx ? 'active' : ''}`;
+      pill.style.padding = '4px 10px';
+      pill.style.fontSize = '0.9rem';
+      pill.style.display = 'inline-flex';
+      pill.style.alignItems = 'center';
+      pill.style.gap = '8px';
+      pill.style.cursor = 'pointer';
+      
+      // Neo-brutalist theme pill styling
+      pill.style.border = '2px solid var(--border)';
+      pill.style.borderRadius = '6px';
+      if (idx === state.selectedAccIdx) {
+        pill.style.background = 'var(--primary)';
+        pill.style.color = 'white';
+        pill.style.boxShadow = '2px 2px 0px var(--border)';
+      } else {
+        pill.style.background = 'white';
+        pill.style.color = 'var(--text)';
+        pill.style.boxShadow = '2px 2px 0px var(--border)';
+      }
+      
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = filename;
+      nameSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.selectedAccIdx = idx;
+        renderActiveAccList();
+        updateColorSelection();
+        drawAvatar();
+      });
+      
+      const deleteBtn = document.createElement('span');
+      deleteBtn.textContent = '❌';
+      deleteBtn.style.fontWeight = 'bold';
+      deleteBtn.style.cursor = 'pointer';
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeAccs.splice(idx, 1);
+        if (state.selectedAccIdx >= activeAccs.length) {
+          state.selectedAccIdx = activeAccs.length - 1;
+        }
+        renderActiveAccList();
+        updateVisualSelection();
+        updateColorSelection();
+        drawAvatar();
+      });
+      
+      pill.appendChild(nameSpan);
+      pill.appendChild(deleteBtn);
+      listEl.appendChild(pill);
+    });
+  };
+
+  renderActiveAccList();
 
   // Download logic
   const downloadBtn = document.getElementById('download-btn');
