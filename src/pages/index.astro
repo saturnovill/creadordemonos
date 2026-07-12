@@ -461,7 +461,7 @@ try {
               
               const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
               const data = imgData.data;
-              const tolerance = 45;
+              const tolerance = isWhiteTarget ? 0 : 45;
               
               // Calculate Y boundaries if base gradient is used on white target
               let minY = 0;
