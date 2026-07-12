@@ -207,6 +207,8 @@ try {
                     <button class="t-btn" id="t-right" title="Derecha">➡️</button>
                     <button class="t-btn" id="t-rot-left" title="Girar Izquierda">↺</button>
                     <button class="t-btn" id="t-rot-right" title="Girar Derecha">↻</button>
+                    <button class="t-btn" id="t-scale-up" title="Agrandar">➕</button>
+                    <button class="t-btn" id="t-scale-down" title="Reducir">➖</button>
                     <button class="t-btn" id="t-reset" title="Resetear">🔄</button>
                   </div>
                 </div>
@@ -243,7 +245,7 @@ try {
 
 <script define:vars={{ availableLayers, bgPatterns }}>
   // Initialize state based on available layers
-  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0 };
+  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1 };
   availableLayers.forEach(layer => {
     // Select first image by default if available, otherwise empty
     state[layer.id] = layer.images.length > 0 ? layer.images[0] : "";
@@ -383,6 +385,7 @@ try {
             ctx.save();
             ctx.translate(canvas.width / 2 + state.hatOffsetX, canvas.height / 2 + state.hatOffsetY);
             ctx.rotate(state.hatRotation * Math.PI / 180);
+            ctx.scale(state.hatScale, state.hatScale);
             ctx.drawImage(imageCache[imgPath], -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
             ctx.restore();
           } else {
@@ -642,10 +645,14 @@ try {
   document.getElementById('t-right')?.addEventListener('click', () => { state.hatOffsetX += moveStep; drawAvatar(); });
   document.getElementById('t-rot-left')?.addEventListener('click', () => { state.hatRotation -= rotStep; drawAvatar(); });
   document.getElementById('t-rot-right')?.addEventListener('click', () => { state.hatRotation += rotStep; drawAvatar(); });
+  const scaleStep = 0.05;
+  document.getElementById('t-scale-up')?.addEventListener('click', () => { state.hatScale += scaleStep; drawAvatar(); });
+  document.getElementById('t-scale-down')?.addEventListener('click', () => { state.hatScale = Math.max(0.1, state.hatScale - scaleStep); drawAvatar(); });
   document.getElementById('t-reset')?.addEventListener('click', () => { 
     state.hatOffsetX = 0; 
     state.hatOffsetY = 0; 
     state.hatRotation = 0; 
+    state.hatScale = 1;
     drawAvatar(); 
   });
 
