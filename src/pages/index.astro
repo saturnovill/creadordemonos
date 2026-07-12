@@ -343,7 +343,30 @@ try {
             // Solid or Gradient color source-in
             offCtx.globalCompositeOperation = 'source-in';
             if (state.baseMode === 'gradient') {
-              const grad = offCtx.createLinearGradient(0, 0, 0, canvas.height);
+              // Find the top and bottom non-transparent pixel boundaries of the base image content
+              const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+              const data = imgData.data;
+              let minY = 0;
+              let maxY = offCanvas.height;
+              
+              findMinY: for (let y = 0; y < offCanvas.height; y++) {
+                for (let x = 0; x < offCanvas.width; x++) {
+                  if (data[(y * offCanvas.width + x) * 4 + 3] > 0) {
+                    minY = y;
+                    break findMinY;
+                  }
+                }
+              }
+              findMaxY: for (let y = offCanvas.height - 1; y >= 0; y--) {
+                for (let x = 0; x < offCanvas.width; x++) {
+                  if (data[(y * offCanvas.width + x) * 4 + 3] > 0) {
+                    maxY = y;
+                    break findMaxY;
+                  }
+                }
+              }
+
+              const grad = offCtx.createLinearGradient(0, minY, 0, maxY);
               grad.addColorStop(0, state.baseColor);
               grad.addColorStop(1, state.baseColor2);
               offCtx.fillStyle = grad;
