@@ -327,47 +327,57 @@ try {
     return matches.map(m => m.replace('$', '#'));
   };
 
-  const replaceColorInData = (data, width, height, targetHex, replacementHex) => {
-    const tRgb = hexToRgb(targetHex);
-    const newRgb = hexToRgb(replacementHex);
-    const tolerance = 45;
+  const replaceColorInData = (data, width, height, targetHexes, replacementHexes) => {
+    // Ensure arrays
+    const tHexes = Array.isArray(targetHexes) ? targetHexes : [targetHexes];
+    const rHexes = Array.isArray(replacementHexes) ? replacementHexes : [replacementHexes];
     
-    const sT = tRgb.r + tRgb.g + tRgb.b;
+    const targets = tHexes.map((hex, i) => {
+      const rgb = hexToRgb(hex);
+      return { rgb, sT: rgb.r + rgb.g + rgb.b, newRgb: hexToRgb(rHexes[i]) };
+    });
+    
+    const tolerance = 45;
     
     for (let i = 0; i < data.length; i += 4) {
       if (data[i+3] > 0) {
         const r = data[i];
         const g = data[i+1];
         const b = data[i+2];
+        const sC = r + g + b;
         
-        // Check absolute distance first
-        const dr = r - tRgb.r;
-        const dg = g - tRgb.g;
-        const db = b - tRgb.b;
-        
-        let matched = false;
-        if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
-          matched = true;
-        } else {
-          // Check normalized match for anti-aliased edges
-          const sC = r + g + b;
-          if (sT > 0 && sC > 0 && (sC / sT > 0.25)) {
-            const dr_n = r / sC - tRgb.r / sT;
-            const dg_n = g / sC - tRgb.g / sT;
-            const db_n = b / sC - tRgb.b / sT;
-            if (Math.abs(dr_n) < 0.08 && Math.abs(dg_n) < 0.08 && Math.abs(db_n) < 0.08) {
-              matched = true;
+        for (let tIdx = 0; tIdx < targets.length; tIdx++) {
+          const { rgb: tRgb, sT, newRgb } = targets[tIdx];
+          if (!newRgb) continue;
+          
+          // Check absolute distance first
+          const dr = r - tRgb.r;
+          const dg = g - tRgb.g;
+          const db = b - tRgb.b;
+          
+          let matched = false;
+          if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
+            matched = true;
+          } else {
+            // Check normalized match for anti-aliased edges
+            if (sT > 0 && sC > 0 && (sC / sT > 0.25)) {
+              const dr_n = r / sC - tRgb.r / sT;
+              const dg_n = g / sC - tRgb.g / sT;
+              const db_n = b / sC - tRgb.b / sT;
+              if (Math.abs(dr_n) < 0.08 && Math.abs(dg_n) < 0.08 && Math.abs(db_n) < 0.08) {
+                matched = true;
+              }
             }
           }
-        }
-        
-        if (matched) {
-          const sC = r + g + b;
-          const k = sT > 0 ? Math.min(1.0, sC / sT) : 1.0;
-          // Retain original shading by multiplying with brightness factor k
-          data[i] = Math.round(k * newRgb.r);
-          data[i+1] = Math.round(k * newRgb.g);
-          data[i+2] = Math.round(k * newRgb.b);
+          
+          if (matched) {
+            const k = sT > 0 ? Math.min(1.0, sC / sT) : 1.0;
+            // Retain original shading by multiplying with brightness factor k
+            data[i] = Math.round(k * newRgb.r);
+            data[i+1] = Math.round(k * newRgb.g);
+            data[i+2] = Math.round(k * newRgb.b);
+            break; // Processed this pixel, don't match other targets
+          }
         }
       }
     }
@@ -668,13 +678,11 @@ try {
               
               const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
               
-              // Replace color 1
-              replaceColorInData(imgData.data, offCanvas.width, offCanvas.height, targets[0], state.ropaColor1);
+              // Replace colors in a single pass to avoid sequential overwrite bugs
+              const replacementColors = [state.ropaColor1];
+              if (targets[1]) replacementColors.push(state.ropaColor2);
               
-              // Replace color 2 if exists
-              if (targets[1]) {
-                replaceColorInData(imgData.data, offCanvas.width, offCanvas.height, targets[1], state.ropaColor2);
-              }
+              replaceColorInData(imgData.data, offCanvas.width, offCanvas.height, targets, replacementColors);
               
               offCtx.putImageData(imgData, 0, 0);
               ctx.drawImage(offCanvas, 0, 0);
