@@ -1305,12 +1305,38 @@ try {
 
   // Download logic
   const downloadBtn = document.getElementById('download-btn');
-  downloadBtn.addEventListener('click', () => {
-    const link = document.createElement('a');
-    link.download = `avatar_${Date.now()}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  });
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      try {
+        const dataUrl = canvas.toDataURL("image/png");
+        
+        // Detect iOS Safari
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isSafari = /WebKit/.test(navigator.userAgent) && !/CriOS|FxiOS|OPiOS|mercury/i.test(navigator.userAgent);
+        
+        if (isIOS && isSafari) {
+          // Fallback for iOS Safari which often blocks or ignores data URI downloads
+          const win = window.open();
+          if (win) {
+            win.document.write(`<meta name="viewport" content="width=device-width, initial-scale=1"><div style="display:flex;flex-direction:column;align-items:center;padding:20px;font-family:sans-serif;"><img src="${dataUrl}" style="max-width:100%; border:1px solid #ccc; border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,0.1);"/><p style="margin-top:20px; font-weight:bold; color:#333; text-align:center;">Mantén presionada la imagen y selecciona "Guardar en Fotos"</p></div>`);
+            win.document.close();
+            return;
+          }
+        }
+        
+        const link = document.createElement('a');
+        link.download = `avatar_${Date.now()}.png`;
+        link.href = dataUrl;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (e) {
+        console.error(e);
+        alert("Error al descargar. Intenta tomar una captura de pantalla.");
+      }
+    });
+  }
 </script>
 
 <style>
