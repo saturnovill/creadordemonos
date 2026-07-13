@@ -330,6 +330,7 @@ try {
     if (activeAccs.length === 0) {
       container.style.display = 'none';
       controlsEl.style.display = 'none';
+      updateColorSelection();
       return;
     }
     
@@ -392,6 +393,7 @@ try {
       pill.appendChild(deleteBtn);
       listEl.appendChild(pill);
     });
+    updateColorSelection();
   };
 
   const canvas = document.getElementById('avatar-canvas');
