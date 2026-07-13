@@ -84,7 +84,7 @@ try {
         <div class="canvas-container">
           <canvas id="avatar-canvas" width="600" height="600"></canvas>
         </div>
-        <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <div class="preview-actions" style="display: flex; gap: 10px; margin-top: 15px;">
           <button id="download-btn" class="neo-button" style="flex: 1;">⬇️ Descargar Avatar</button>
           <button id="random-btn" class="neo-button" style="background: var(--secondary); padding: 0.75rem; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;" title="Aleatorio">🎲</button>
         </div>
@@ -1337,6 +1337,73 @@ try {
       }
     });
   }
+
+  // Dynamic Autocrop & Center for Previews
+  const autocropThumbnail = (img) => {
+    const run = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const size = 50; // Small size for high-speed analysis
+        canvas.width = size;
+        canvas.height = size;
+        
+        ctx.drawImage(img, 0, 0, size, size);
+        const imgData = ctx.getImageData(0, 0, size, size).data;
+        
+        let minX = size, minY = size, maxX = 0, maxY = 0;
+        let hasPixels = false;
+        
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const alpha = imgData[(y * size + x) * 4 + 3];
+            if (alpha > 10) { 
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+              hasPixels = true;
+            }
+          }
+        }
+        
+        if (!hasPixels) return;
+        
+        const w = maxX - minX;
+        const h = maxY - minY;
+        const contentSize = Math.max(w, h);
+        
+        if (contentSize === 0) return;
+        
+        // Fill 72% of thumbnail area
+        const scale = (size / contentSize) * 0.72;
+        const centerX = (minX + maxX) / 2;
+        const centerY = (minY + maxY) / 2;
+        
+        img.style.transformOrigin = `${(centerX / size) * 100}% ${(centerY / size) * 100}%`;
+        img.style.transform = `scale(${Math.min(4, scale)})`; 
+      } catch (e) {
+        console.warn("Autocrop error for", img.src, e);
+      }
+    };
+
+    if (img.complete) {
+      run();
+    } else {
+      img.addEventListener('load', run);
+    }
+  };
+
+  const initAutocrop = () => {
+    const accImgs = document.querySelectorAll('[id*="ACCESORIO"] .option-item img');
+    accImgs.forEach(img => autocropThumbnail(img));
+  };
+
+  if (document.readyState === 'complete') {
+    initAutocrop();
+  } else {
+    window.addEventListener('load', initAutocrop);
+  }
 </script>
 
 <style>
@@ -1362,67 +1429,6 @@ try {
     display: flex;
     gap: 2rem;
     align-items: flex-start;
-  }
-  
-  @media (max-width: 768px) {
-    .header {
-      display: none;
-    }
-    .app-layout {
-      flex-direction: column;
-    }
-    .preview-section {
-      position: sticky;
-      top: 0;
-      padding: 0.5rem;
-      z-index: 10;
-      gap: 0.5rem;
-      border-top: none;
-      border-radius: 0 0 12px 12px;
-    }
-    .canvas-container {
-      max-width: 150px;
-    }
-    .controls-section {
-      padding: 1rem;
-      min-height: auto;
-      width: 100%;
-    }
-    .container {
-      padding: 0;
-    }
-    .title {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-    }
-    .tabs {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      padding-bottom: 0.5rem;
-      margin-bottom: 1rem;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
-    }
-    .tabs::-webkit-scrollbar {
-      height: 6px;
-    }
-    .tabs::-webkit-scrollbar-thumb {
-      background-color: var(--border);
-      border-radius: 3px;
-    }
-    .tab-btn {
-      flex-shrink: 0;
-      font-size: 0.9rem;
-      padding: 6px 12px;
-    }
-    .options-grid {
-      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
-      gap: 0.5rem;
-    }
-    .neo-button {
-      padding: 8px 16px;
-      font-size: 1rem;
-    }
   }
   
   .preview-section {
@@ -1510,7 +1516,9 @@ try {
     border-radius: 8px;
     cursor: pointer;
     overflow: hidden;
-    background: white;
+    background-color: white;
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAMElEQVQ4T2NkYOD4z8ABYIwMjAxUB8AATsBqGJ9gHDWMMQz+j8Cjho0aRihYnAwEACi7Qwm75F2wAAAAAElFTkSuQmCC');
+    background-repeat: repeat;
     transition: transform 0.2s, box-shadow 0.2s;
   }
   
@@ -1529,7 +1537,23 @@ try {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAMElEQVQ4T2NkYOD4z8ABYIwMjAxUB8AATsBqGJ9gHDWMMQz+j8Cjho0aRihYnAwEACi7Qwm75F2wAAAAAElFTkSuQmCC') repeat;
+    background: transparent;
+    transition: transform 0.2s;
+  }
+  
+  /* Zoom overrides to crop transparent whitespace in previews */
+  [id="3_ROPA"] .option-item img {
+    transform: scale(1.4) translateY(-18%);
+  }
+  [id="4_SOMBRERO"] .option-item img {
+    transform: scale(1.8);
+    transform-origin: center 25%;
+  }
+  [id="5_OJOS"] .option-item img {
+    transform: scale(2.6) translateY(-14%);
+  }
+  [id="6_BOCA"] .option-item img {
+    transform: scale(2.8) translateY(-22%);
   }
   
   .empty-option {
@@ -1701,5 +1725,74 @@ try {
     align-items: center;
     cursor: pointer;
     text-align: center;
+  }
+  
+  @media (max-width: 768px) {
+    .header {
+      display: none;
+    }
+    .app-layout {
+      flex-direction: column;
+    }
+    .preview-section {
+      position: sticky;
+      top: 0;
+      padding: 0.75rem;
+      z-index: 10;
+      gap: 0.75rem;
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+    }
+    .preview-actions {
+      margin-top: 0 !important;
+    }
+    .canvas-container {
+      max-width: 100%;
+      width: 100%;
+    }
+    .controls-section {
+      padding: 1rem;
+      min-height: auto;
+      width: 100%;
+    }
+    .container {
+      padding: 0 !important;
+    }
+    .title {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    .tabs {
+      flex-wrap: nowrap !important;
+      overflow-x: auto;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: thin;
+    }
+    .tabs::-webkit-scrollbar {
+      height: 6px;
+    }
+    .tabs::-webkit-scrollbar-thumb {
+      background-color: var(--border);
+      border-radius: 3px;
+    }
+    .tab-btn {
+      flex-shrink: 0;
+      font-size: 0.9rem;
+      padding: 6px 12px;
+    }
+    .options-grid {
+      grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+      gap: 0.5rem;
+    }
+    .neo-button {
+      padding: 6px 12px !important;
+      font-size: 0.85rem !important;
+    }
+    #random-btn {
+      padding: 6px !important;
+      font-size: 1.2rem !important;
+    }
   }
 </style>
