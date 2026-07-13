@@ -327,6 +327,52 @@ try {
     return matches.map(m => m.replace('$', '#'));
   };
 
+  const replaceColorInData = (data, width, height, targetHex, replacementHex) => {
+    const tRgb = hexToRgb(targetHex);
+    const newRgb = hexToRgb(replacementHex);
+    const tolerance = 45;
+    
+    const sT = tRgb.r + tRgb.g + tRgb.b;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i+3] > 0) {
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
+        
+        // Check absolute distance first
+        const dr = r - tRgb.r;
+        const dg = g - tRgb.g;
+        const db = b - tRgb.b;
+        
+        let matched = false;
+        if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
+          matched = true;
+        } else {
+          // Check normalized match for anti-aliased edges
+          const sC = r + g + b;
+          if (sT > 0 && sC > 0 && (sC / sT > 0.25)) {
+            const dr_n = r / sC - tRgb.r / sT;
+            const dg_n = g / sC - tRgb.g / sT;
+            const db_n = b / sC - tRgb.b / sT;
+            if (Math.abs(dr_n) < 0.08 && Math.abs(dg_n) < 0.08 && Math.abs(db_n) < 0.08) {
+              matched = true;
+            }
+          }
+        }
+        
+        if (matched) {
+          const sC = r + g + b;
+          const k = sT > 0 ? Math.min(1.0, sC / sT) : 1.0;
+          // Retain original shading by multiplying with brightness factor k
+          data[i] = Math.round(k * newRgb.r);
+          data[i+1] = Math.round(k * newRgb.g);
+          data[i+2] = Math.round(k * newRgb.b);
+        }
+      }
+    }
+  };
+
   const updateRopaColorControls = () => {
     const pickerSection = document.getElementById('ropa-color-picker-section');
     const container1 = document.getElementById('ropa-color1-container');
@@ -621,39 +667,15 @@ try {
               offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
               
               const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
-              const data = imgData.data;
-              const tolerance = 45;
               
-              const targetRgb1 = hexToRgb(targets[0]);
-              const newRgb1 = hexToRgb(state.ropaColor1);
+              // Replace color 1
+              replaceColorInData(imgData.data, offCanvas.width, offCanvas.height, targets[0], state.ropaColor1);
               
-              const targetRgb2 = targets[1] ? hexToRgb(targets[1]) : null;
-              const newRgb2 = targets[1] ? hexToRgb(state.ropaColor2) : null;
-              
-              for (let i = 0; i < data.length; i += 4) {
-                if (data[i+3] > 0) {
-                  const dr1 = data[i] - targetRgb1.r;
-                  const dg1 = data[i+1] - targetRgb1.g;
-                  const db1 = data[i+2] - targetRgb1.b;
-                  if (Math.abs(dr1) < tolerance && Math.abs(dg1) < tolerance && Math.abs(db1) < tolerance) {
-                    data[i] = newRgb1.r;
-                    data[i+1] = newRgb1.g;
-                    data[i+2] = newRgb1.b;
-                    continue;
-                  }
-                  
-                  if (targetRgb2) {
-                    const dr2 = data[i] - targetRgb2.r;
-                    const dg2 = data[i+1] - targetRgb2.g;
-                    const db2 = data[i+2] - targetRgb2.b;
-                    if (Math.abs(dr2) < tolerance && Math.abs(dg2) < tolerance && Math.abs(db2) < tolerance) {
-                      data[i] = newRgb2.r;
-                      data[i+1] = newRgb2.g;
-                      data[i+2] = newRgb2.b;
-                    }
-                  }
-                }
+              // Replace color 2 if exists
+              if (targets[1]) {
+                replaceColorInData(imgData.data, offCanvas.width, offCanvas.height, targets[1], state.ropaColor2);
               }
+              
               offCtx.putImageData(imgData, 0, 0);
               ctx.drawImage(offCanvas, 0, 0);
             } else {
@@ -685,25 +707,9 @@ try {
                 
                 offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
                 
-                const tRgb = hexToRgb(targetHex);
-                const newRgb = hexToRgb(acc.color);
-                
                 const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
-                const data = imgData.data;
-                const tolerance = 45;
-
-                for (let i = 0; i < data.length; i += 4) {
-                  if (data[i+3] > 0) {
-                    const dr = data[i] - tRgb.r;
-                    const dg = data[i+1] - tRgb.g;
-                    const db = data[i+2] - tRgb.b;
-                    if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
-                      data[i] = newRgb.r;
-                      data[i+1] = newRgb.g;
-                      data[i+2] = newRgb.b;
-                    }
-                  }
-                }
+                replaceColorInData(imgData.data, offCanvas.width, offCanvas.height, targetHex, acc.color);
+                
                 offCtx.putImageData(imgData, 0, 0);
                 ctx.drawImage(offCanvas, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
               } else {
