@@ -197,6 +197,26 @@ try {
                   </div>
                 </div>
               )}
+              {layer.id.includes('ROPA') && (
+                <div id="ropa-color-picker-section" style="margin-bottom: 1.5rem; display: none; flex-direction: column; gap: 1rem;">
+                  <!-- Color Principal -->
+                  <div class="color-picker-section" style="margin-bottom: 0;" id="ropa-color1-container">
+                    <h3 class="color-picker-title" id="ropa-color1-title">Color Principal</h3>
+                    <div class="color-picker-wrapper">
+                      <input type="color" class="neo-color-picker" id="ropa-color1-input" value="#ffffff" />
+                      <span class="color-value" id="ropa-color1-val">#ffffff</span>
+                    </div>
+                  </div>
+                  <!-- Color Secundario -->
+                  <div class="color-picker-section" style="margin-bottom: 0;" id="ropa-color2-container">
+                    <h3 class="color-picker-title" id="ropa-color2-title">Color Secundario</h3>
+                    <div class="color-picker-wrapper">
+                      <input type="color" class="neo-color-picker" id="ropa-color2-input" value="#ffffff" />
+                      <span class="color-value" id="ropa-color2-val">#ffffff</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               {layer.id.includes('SOMBRERO') && (
                 <div class="transform-controls-section">
                   <h3 class="color-picker-title">Ajustar Sombrero</h3>
@@ -298,13 +318,69 @@ try {
   };
 
   // Initialize state based on available layers
-  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, selectedAccIdx: -1 };
+  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, selectedAccIdx: -1, ropaColor1: '#ffffff', ropaColor2: '#ffffff' };
+  
+  const parseTargetColors = (path) => {
+    if (!path) return [];
+    const matches = path.match(/\$([0-9a-fA-F]{6})/g);
+    if (!matches) return [];
+    return matches.map(m => m.replace('$', '#'));
+  };
+
+  const updateRopaColorControls = () => {
+    const pickerSection = document.getElementById('ropa-color-picker-section');
+    const container1 = document.getElementById('ropa-color1-container');
+    const container2 = document.getElementById('ropa-color2-container');
+    
+    if (!pickerSection || !container1 || !container2) return;
+    
+    const layerId = availableLayers.find(l => l.id.includes('ROPA'))?.id;
+    const imgPath = state[layerId];
+    
+    if (!imgPath) {
+      pickerSection.style.display = 'none';
+      return;
+    }
+    
+    const targets = parseTargetColors(imgPath);
+    
+    if (targets.length === 0) {
+      pickerSection.style.display = 'none';
+    } else {
+      pickerSection.style.display = 'flex';
+      
+      // Color 1
+      container1.style.display = 'block';
+      const c1Input = document.getElementById('ropa-color1-input');
+      const c1Val = document.getElementById('ropa-color1-val');
+      if (c1Input) c1Input.value = state.ropaColor1;
+      if (c1Val) c1Val.textContent = state.ropaColor1.toUpperCase();
+      
+      // Color 2
+      if (targets.length >= 2) {
+        container2.style.display = 'block';
+        const c2Input = document.getElementById('ropa-color2-input');
+        const c2Val = document.getElementById('ropa-color2-val');
+        if (c2Input) c2Input.value = state.ropaColor2;
+        if (c2Val) c2Val.textContent = state.ropaColor2.toUpperCase();
+      } else {
+        container2.style.display = 'none';
+      }
+    }
+  };
+
   availableLayers.forEach(layer => {
     if (layer.id.includes('ACCESORIO')) {
       state[layer.id] = [];
     } else {
       // Select first image by default if available, otherwise empty
-      state[layer.id] = layer.images.length > 0 ? layer.images[0] : "";
+      const defaultImg = layer.images.length > 0 ? layer.images[0] : "";
+      state[layer.id] = defaultImg;
+      if (layer.id.includes('ROPA') && defaultImg) {
+        const targets = parseTargetColors(defaultImg);
+        if (targets[0]) state.ropaColor1 = targets[0];
+        if (targets[1]) state.ropaColor2 = targets[1];
+      }
     }
   });
 
@@ -534,6 +610,55 @@ try {
             offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
             
             ctx.drawImage(offCanvas, 0, 0);
+          } else if (layer.id.includes('ROPA')) {
+            const targets = parseTargetColors(imgPath);
+            if (targets.length > 0) {
+              const offCanvas = document.createElement('canvas');
+              offCanvas.width = canvas.width;
+              offCanvas.height = canvas.height;
+              const offCtx = offCanvas.getContext('2d');
+              
+              offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
+              
+              const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+              const data = imgData.data;
+              const tolerance = 45;
+              
+              const targetRgb1 = hexToRgb(targets[0]);
+              const newRgb1 = hexToRgb(state.ropaColor1);
+              
+              const targetRgb2 = targets[1] ? hexToRgb(targets[1]) : null;
+              const newRgb2 = targets[1] ? hexToRgb(state.ropaColor2) : null;
+              
+              for (let i = 0; i < data.length; i += 4) {
+                if (data[i+3] > 0) {
+                  const dr1 = data[i] - targetRgb1.r;
+                  const dg1 = data[i+1] - targetRgb1.g;
+                  const db1 = data[i+2] - targetRgb1.b;
+                  if (Math.abs(dr1) < tolerance && Math.abs(dg1) < tolerance && Math.abs(db1) < tolerance) {
+                    data[i] = newRgb1.r;
+                    data[i+1] = newRgb1.g;
+                    data[i+2] = newRgb1.b;
+                    continue;
+                  }
+                  
+                  if (targetRgb2) {
+                    const dr2 = data[i] - targetRgb2.r;
+                    const dg2 = data[i+1] - targetRgb2.g;
+                    const db2 = data[i+2] - targetRgb2.b;
+                    if (Math.abs(dr2) < tolerance && Math.abs(dg2) < tolerance && Math.abs(db2) < tolerance) {
+                      data[i] = newRgb2.r;
+                      data[i+1] = newRgb2.g;
+                      data[i+2] = newRgb2.b;
+                    }
+                  }
+                }
+              }
+              offCtx.putImageData(imgData, 0, 0);
+              ctx.drawImage(offCanvas, 0, 0);
+            } else {
+              ctx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
+            }
           } else if (layer.id.includes('SOMBRERO')) {
             ctx.save();
             ctx.translate(canvas.width / 2 + state.hatOffsetX, canvas.height / 2 + state.hatOffsetY);
@@ -674,6 +799,13 @@ try {
         }
       } else {
         state[layer] = img;
+        if (layer.includes('ROPA')) {
+          if (img) {
+            const targets = parseTargetColors(img);
+            if (targets[0]) state.ropaColor1 = targets[0];
+            if (targets[1]) state.ropaColor2 = targets[1];
+          }
+        }
       }
       updateVisualSelection();
       renderActiveAccList();
@@ -764,6 +896,7 @@ try {
       if (idx === state.bgPattern) item.classList.add('selected');
       else item.classList.remove('selected');
     });
+    updateRopaColorControls();
   };
   
   updateColorSelection();
@@ -792,6 +925,8 @@ try {
   setupColorInput('pat-c1b-input', 'patC1b');
   setupColorInput('pat-c2a-input', 'patC2a');
   setupColorInput('pat-c2b-input', 'patC2b');
+  setupColorInput('ropa-color1-input', 'ropaColor1');
+  setupColorInput('ropa-color2-input', 'ropaColor2');
   const baseGradToggle = document.getElementById('base-grad-toggle');
   const baseColor2Container = document.getElementById('base-color2-container');
   if (baseGradToggle) {
