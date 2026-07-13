@@ -334,10 +334,19 @@ try {
     
     const targets = tHexes.map((hex, i) => {
       const rgb = hexToRgb(hex);
-      return { rgb, sT: rgb.r + rgb.g + rgb.b, newRgb: hexToRgb(rHexes[i]) };
+      const sT = rgb.r + rgb.g + rgb.b;
+      return { 
+        rgb, 
+        sT, 
+        rn: sT > 0 ? rgb.r / sT : 0,
+        gn: sT > 0 ? rgb.g / sT : 0,
+        bn: sT > 0 ? rgb.b / sT : 0,
+        newRgb: hexToRgb(rHexes[i]) 
+      };
     });
     
-    const tolerance = 45;
+    // Increased tolerance to catch small/compressed artifacts
+    const tolerance = 65; 
     
     for (let i = 0; i < data.length; i += 4) {
       if (data[i+3] > 0) {
@@ -346,38 +355,54 @@ try {
         const b = data[i+2];
         const sC = r + g + b;
         
+        let bestTargetIdx = -1;
+        
+        // 1. Try absolute match first
         for (let tIdx = 0; tIdx < targets.length; tIdx++) {
-          const { rgb: tRgb, sT, newRgb } = targets[tIdx];
-          if (!newRgb) continue;
+          const t = targets[tIdx];
+          if (!t.newRgb) continue;
           
-          // Check absolute distance first
-          const dr = r - tRgb.r;
-          const dg = g - tRgb.g;
-          const db = b - tRgb.b;
+          const dr = Math.abs(r - t.rgb.r);
+          const dg = Math.abs(g - t.rgb.g);
+          const db = Math.abs(b - t.rgb.b);
           
-          let matched = false;
-          if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
-            matched = true;
-          } else {
-            // Check normalized match for anti-aliased edges
-            if (sT > 0 && sC > 0 && (sC / sT > 0.25)) {
-              const dr_n = r / sC - tRgb.r / sT;
-              const dg_n = g / sC - tRgb.g / sT;
-              const db_n = b / sC - tRgb.b / sT;
-              if (Math.abs(dr_n) < 0.08 && Math.abs(dg_n) < 0.08 && Math.abs(db_n) < 0.08) {
-                matched = true;
+          if (dr < tolerance && dg < tolerance && db < tolerance) {
+            bestTargetIdx = tIdx;
+            break; // Stop at first absolute match
+          }
+        }
+        
+        // 2. If no absolute match, find the BEST normalized match for anti-aliased borders
+        if (bestTargetIdx === -1 && sC > 0) {
+          let minDn = Infinity;
+          const rn = r / sC;
+          const gn = g / sC;
+          const bn = b / sC;
+          
+          for (let tIdx = 0; tIdx < targets.length; tIdx++) {
+            const t = targets[tIdx];
+            if (!t.newRgb || t.sT === 0) continue;
+            
+            // Only consider pixels that are somewhat bright relative to the target (0.15 threshold)
+            if (sC / t.sT > 0.15) {
+              const dn = Math.abs(rn - t.rn) + Math.abs(gn - t.gn) + Math.abs(bn - t.bn);
+              // Max allowed normalized distance for a match (0.24 is safe)
+              if (dn < 0.24 && dn < minDn) {
+                minDn = dn;
+                bestTargetIdx = tIdx;
               }
             }
           }
-          
-          if (matched) {
-            const k = sT > 0 ? Math.min(1.0, sC / sT) : 1.0;
-            // Retain original shading by multiplying with brightness factor k
-            data[i] = Math.round(k * newRgb.r);
-            data[i+1] = Math.round(k * newRgb.g);
-            data[i+2] = Math.round(k * newRgb.b);
-            break; // Processed this pixel, don't match other targets
-          }
+        }
+        
+        // 3. Apply the best match
+        if (bestTargetIdx !== -1) {
+          const t = targets[bestTargetIdx];
+          const k = t.sT > 0 ? Math.min(1.0, sC / t.sT) : 1.0;
+          // Retain original shading by multiplying with brightness factor k
+          data[i] = Math.round(k * t.newRgb.r);
+          data[i+1] = Math.round(k * t.newRgb.g);
+          data[i+2] = Math.round(k * t.newRgb.b);
         }
       }
     }
