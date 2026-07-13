@@ -217,6 +217,15 @@ try {
                   </div>
                 </div>
               )}
+              {(layer.id.includes('BOCA') || layer.id.includes('OJOS')) && (
+                <div class="color-picker-section" style="margin-bottom: 1.5rem;">
+                  <h3 class="color-picker-title">Color Borde</h3>
+                  <div class="color-picker-wrapper">
+                    <input type="color" class="neo-color-picker" id={`borde-color-input-${layer.id.includes('BOCA') ? 'BOCA' : 'OJOS'}`} value="#000000" />
+                    <span class="color-value" id={`borde-color-val-${layer.id.includes('BOCA') ? 'BOCA' : 'OJOS'}`}>#000000</span>
+                  </div>
+                </div>
+              )}
               {layer.id.includes('SOMBRERO') && (
                 <div class="transform-controls-section">
                   <h3 class="color-picker-title">Ajustar Sombrero</h3>
@@ -318,7 +327,7 @@ try {
   };
 
   // Initialize state based on available layers
-  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, selectedAccIdx: -1, ropaColor1: '#ffffff', ropaColor2: '#ffffff' };
+  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, selectedAccIdx: -1, ropaColor1: '#ffffff', ropaColor2: '#ffffff', bordeColorBOCA: '#000000', bordeColorOJOS: '#000000' };
   
   const parseTargetColors = (path) => {
     if (!path) return [];
@@ -334,19 +343,10 @@ try {
     
     const targets = tHexes.map((hex, i) => {
       const rgb = hexToRgb(hex);
-      const sT = rgb.r + rgb.g + rgb.b;
-      return { 
-        rgb, 
-        sT, 
-        rn: sT > 0 ? rgb.r / sT : 0,
-        gn: sT > 0 ? rgb.g / sT : 0,
-        bn: sT > 0 ? rgb.b / sT : 0,
-        newRgb: hexToRgb(rHexes[i]) 
-      };
+      return { rgb, sT: rgb.r + rgb.g + rgb.b, newRgb: hexToRgb(rHexes[i]) };
     });
     
-    // Increased tolerance to catch small/compressed artifacts
-    const tolerance = 65; 
+    const tolerance = 45;
     
     for (let i = 0; i < data.length; i += 4) {
       if (data[i+3] > 0) {
@@ -355,54 +355,65 @@ try {
         const b = data[i+2];
         const sC = r + g + b;
         
-        let bestTargetIdx = -1;
-        
-        // 1. Try absolute match first
         for (let tIdx = 0; tIdx < targets.length; tIdx++) {
-          const t = targets[tIdx];
-          if (!t.newRgb) continue;
+          const { rgb: tRgb, sT, newRgb } = targets[tIdx];
+          if (!newRgb) continue;
           
-          const dr = Math.abs(r - t.rgb.r);
-          const dg = Math.abs(g - t.rgb.g);
-          const db = Math.abs(b - t.rgb.b);
+          // Check absolute distance first
+          const dr = r - tRgb.r;
+          const dg = g - tRgb.g;
+          const db = b - tRgb.b;
           
-          if (dr < tolerance && dg < tolerance && db < tolerance) {
-            bestTargetIdx = tIdx;
-            break; // Stop at first absolute match
-          }
-        }
-        
-        // 2. If no absolute match, find the BEST normalized match for anti-aliased borders
-        if (bestTargetIdx === -1 && sC > 0) {
-          let minDn = Infinity;
-          const rn = r / sC;
-          const gn = g / sC;
-          const bn = b / sC;
-          
-          for (let tIdx = 0; tIdx < targets.length; tIdx++) {
-            const t = targets[tIdx];
-            if (!t.newRgb || t.sT === 0) continue;
-            
-            // Only consider pixels that are somewhat bright relative to the target (0.15 threshold)
-            if (sC / t.sT > 0.15) {
-              const dn = Math.abs(rn - t.rn) + Math.abs(gn - t.gn) + Math.abs(bn - t.bn);
-              // Max allowed normalized distance for a match (0.24 is safe)
-              if (dn < 0.24 && dn < minDn) {
-                minDn = dn;
-                bestTargetIdx = tIdx;
+          let matched = false;
+          if (Math.abs(dr) < tolerance && Math.abs(dg) < tolerance && Math.abs(db) < tolerance) {
+            matched = true;
+          } else {
+            // Check normalized match for anti-aliased edges
+            if (sT > 0 && sC > 0 && (sC / sT > 0.25)) {
+              const dr_n = r / sC - tRgb.r / sT;
+              const dg_n = g / sC - tRgb.g / sT;
+              const db_n = b / sC - tRgb.b / sT;
+              if (Math.abs(dr_n) < 0.08 && Math.abs(dg_n) < 0.08 && Math.abs(db_n) < 0.08) {
+                matched = true;
               }
             }
           }
+          
+          if (matched) {
+            const k = sT > 0 ? Math.min(1.0, sC / sT) : 1.0;
+            // Retain original shading by multiplying with brightness factor k
+            data[i] = Math.round(k * newRgb.r);
+            data[i+1] = Math.round(k * newRgb.g);
+            data[i+2] = Math.round(k * newRgb.b);
+            break; // Processed this pixel, don't match other targets
+          }
         }
+      }
+    }
+  };
+
+  const replaceBlackInData = (data, width, height, replacementHex) => {
+    const newRgb = hexToRgb(replacementHex);
+    if (newRgb.r === 0 && newRgb.g === 0 && newRgb.b === 0) return;
+    
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i+3] > 0) {
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
         
-        // 3. Apply the best match
-        if (bestTargetIdx !== -1) {
-          const t = targets[bestTargetIdx];
-          const k = t.sT > 0 ? Math.min(1.0, sC / t.sT) : 1.0;
-          // Retain original shading by multiplying with brightness factor k
-          data[i] = Math.round(k * t.newRgb.r);
-          data[i+1] = Math.round(k * t.newRgb.g);
-          data[i+2] = Math.round(k * t.newRgb.b);
+        const maxC = Math.max(r, g, b);
+        const minC = Math.min(r, g, b);
+        
+        // If the pixel is mostly grayscale (diff < 30), treat it as black ink or anti-aliased black edge
+        if (maxC - minC < 30) {
+          const v = (r + g + b) / 3;
+          const factor = (255 - v) / 255;
+          if (factor > 0) {
+            data[i] = Math.min(255, Math.round(v + factor * newRgb.r));
+            data[i+1] = Math.min(255, Math.round(v + factor * newRgb.g));
+            data[i+2] = Math.min(255, Math.round(v + factor * newRgb.b));
+          }
         }
       }
     }
@@ -750,6 +761,26 @@ try {
               }
               ctx.restore();
             }
+          } else if (layer.id.includes('BOCA') || layer.id.includes('OJOS')) {
+            const isBoca = layer.id.includes('BOCA');
+            const bordeColor = isBoca ? state.bordeColorBOCA : state.bordeColorOJOS;
+            
+            if (bordeColor !== '#000000') {
+              const offCanvas = document.createElement('canvas');
+              offCanvas.width = canvas.width;
+              offCanvas.height = canvas.height;
+              const offCtx = offCanvas.getContext('2d');
+              
+              offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
+              
+              const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+              replaceBlackInData(imgData.data, offCanvas.width, offCanvas.height, bordeColor);
+              
+              offCtx.putImageData(imgData, 0, 0);
+              ctx.drawImage(offCanvas, 0, 0);
+            } else {
+              ctx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
+            }
           } else {
             ctx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
           }
@@ -966,6 +997,8 @@ try {
   setupColorInput('pat-c2b-input', 'patC2b');
   setupColorInput('ropa-color1-input', 'ropaColor1');
   setupColorInput('ropa-color2-input', 'ropaColor2');
+  setupColorInput('borde-color-input-BOCA', 'bordeColorBOCA');
+  setupColorInput('borde-color-input-OJOS', 'bordeColorOJOS');
   const baseGradToggle = document.getElementById('base-grad-toggle');
   const baseColor2Container = document.getElementById('base-color2-container');
   if (baseGradToggle) {
