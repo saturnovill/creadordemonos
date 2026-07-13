@@ -84,7 +84,10 @@ try {
         <div class="canvas-container">
           <canvas id="avatar-canvas" width="600" height="600"></canvas>
         </div>
-        <button id="download-btn" class="neo-button">⬇️ Descargar Avatar</button>
+        <div style="display: flex; gap: 10px; margin-top: 15px;">
+          <button id="download-btn" class="neo-button" style="flex: 1;">⬇️ Descargar Avatar</button>
+          <button id="random-btn" class="neo-button" style="flex: 1; background: var(--secondary);">🎲 Random</button>
+        </div>
       </section>
 
       <!-- Right side: Controls -->
@@ -306,7 +309,7 @@ try {
   </main>
 </Layout>
 
-<script define:vars={{ availableLayers, bgPatterns }}>
+<script define:vars={{ availableLayers, bgPatterns, baseColors }}>
   const hexToRgb = (hex) => {
     const num = parseInt(hex.replace('#', ''), 16);
     return {
@@ -1185,6 +1188,120 @@ try {
   });
 
   renderActiveAccList();
+
+  // Random logic
+  const randomBtn = document.getElementById('random-btn');
+  if (randomBtn) {
+    randomBtn.addEventListener('click', () => {
+      const modes = ['solid', 'gradient', 'pattern', 'image'];
+      state.bgMode = modes[Math.floor(Math.random() * modes.length)];
+      
+      availableLayers.forEach(layer => {
+        const images = layer.images;
+        if (images && images.length > 0) {
+          if (layer.id.includes('ACCESORIO')) {
+             if (Math.random() > 0.3) {
+               const randomImg = images[Math.floor(Math.random() * images.length)];
+               state[layer.id] = [{
+                  path: randomImg,
+                  offsetX: 0, offsetY: 0, rotation: 0, scale: 1, 
+                  color: baseColors[Math.floor(Math.random() * baseColors.length)]
+               }];
+             } else {
+               state[layer.id] = [];
+             }
+             state.selectedAccIdx = state[layer.id].length > 0 ? 0 : -1;
+          } else if (layer.id.includes('FONDO')) {
+             state[layer.id] = images[Math.floor(Math.random() * images.length)];
+          } else {
+             if (layer.id.includes('SOMBRERO') && Math.random() > 0.5) {
+               state[layer.id] = "";
+             } else {
+               state[layer.id] = images[Math.floor(Math.random() * images.length)];
+             }
+          }
+        }
+      });
+      
+      state.baseColor = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.baseColor2 = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.bgColor1 = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.bgColor2 = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.patC1a = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.patC1b = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.patC2a = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.patC2b = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.ropaColor1 = baseColors[Math.floor(Math.random() * baseColors.length)];
+      state.ropaColor2 = baseColors[Math.floor(Math.random() * baseColors.length)];
+      
+      if (Math.random() > 0.8) {
+        state.bordeColorBOCA = baseColors[Math.floor(Math.random() * baseColors.length)];
+        state.bordeColorOJOS = baseColors[Math.floor(Math.random() * baseColors.length)];
+      } else {
+        state.bordeColorBOCA = '#000000';
+        state.bordeColorOJOS = '#000000';
+      }
+
+      state.bgPattern = Math.floor(Math.random() * bgPatterns.length);
+
+      state.hatOffsetX = 0;
+      state.hatOffsetY = 0;
+      state.hatRotation = 0;
+      state.hatScale = 1;
+
+      const rMode = document.querySelector(`input[name="bg-mode"][value="${state.bgMode}"]`);
+      if (rMode) rMode.checked = true;
+      
+      const updateColorVal = (id, val) => {
+        const input = document.getElementById(`${id}-input`);
+        const span = document.getElementById(`${id}-val`);
+        if(input) input.value = val;
+        if(span) span.textContent = val;
+      };
+      updateColorVal('base-color', state.baseColor);
+      updateColorVal('base-color2', state.baseColor2);
+      updateColorVal('bg-color1', state.bgColor1);
+      updateColorVal('bg-color2', state.bgColor2);
+      updateColorVal('pat-c1a', state.patC1a);
+      updateColorVal('pat-c1b', state.patC1b);
+      updateColorVal('pat-c2a', state.patC2a);
+      updateColorVal('pat-c2b', state.patC2b);
+      updateColorVal('ropa-color1', state.ropaColor1);
+      updateColorVal('ropa-color2', state.ropaColor2);
+      updateColorVal('borde-color-BOCA', state.bordeColorBOCA);
+      updateColorVal('borde-color-OJOS', state.bordeColorOJOS);
+
+      const fondoOptions = document.querySelectorAll('.fondo-options-container');
+      const solidPicker = document.getElementById('solid-color-picker');
+      const gradientPicker = document.getElementById('gradient-color-picker');
+      const patternPicker = document.getElementById('pattern-picker');
+      const patternColorsSection = document.getElementById('pattern-colors-section');
+      
+      fondoOptions.forEach(el => el.style.display = 'none');
+      if (solidPicker) solidPicker.style.display = 'none';
+      if (gradientPicker) gradientPicker.style.display = 'none';
+      if (patternPicker) patternPicker.style.display = 'none';
+      if (patternColorsSection) patternColorsSection.style.display = 'none';
+
+      if (state.bgMode === 'image') {
+        fondoOptions.forEach(el => el.style.display = '');
+      } else if (state.bgMode === 'solid') {
+        if (solidPicker) solidPicker.style.display = 'block';
+      } else if (state.bgMode === 'gradient') {
+        if (solidPicker) solidPicker.style.display = 'block';
+        if (gradientPicker) gradientPicker.style.display = 'block';
+      } else if (state.bgMode === 'pattern') {
+        if (patternPicker) patternPicker.style.display = 'block';
+        if (patternColorsSection) patternColorsSection.style.display = 'block';
+      }
+
+      updateVisualSelection();
+      updateRopaColorControls();
+      updateColorSelection();
+      if (typeof renderActiveAccList !== 'undefined') renderActiveAccList();
+      drawAvatar();
+    });
+  }
 
   // Download logic
   const downloadBtn = document.getElementById('download-btn');
