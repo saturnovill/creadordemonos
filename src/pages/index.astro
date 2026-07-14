@@ -64,7 +64,7 @@ try {
     const files = fs.readdirSync(p).filter(f => f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.svg'));
     return {
       id: folder,
-      name: folder.replace(/^\d+_/, ''),
+      name: folder.replace(/^\d+_/, '').replace(/_/g, ' '),
       images: files.map(file => `/layers/${folder}/${file}`)
     };
   });
@@ -73,7 +73,7 @@ try {
   if (manoDerecha) {
     availableLayers.push({
       id: '9_MANO_IZQUIERDA',
-      name: 'MANO_IZQUIERDA',
+      name: 'MANO IZQUIERDA',
       images: [...manoDerecha.images]
     });
   }
@@ -1284,7 +1284,7 @@ try {
           } else if (layer.id.includes('FONDO')) {
              state[layer.id] = images[Math.floor(Math.random() * images.length)];
           } else {
-             if ((layer.id.includes('SOMBRERO') || layer.id.includes('MANO_IZQUIERDA')) && Math.random() > 0.5) {
+             if ((layer.id.includes('SOMBRERO') || layer.id.includes('MANO_IZQUIERDA') || layer.id.includes('MANO_DERECHA')) && Math.random() > 0.5) {
                state[layer.id] = "";
              } else {
                state[layer.id] = images[Math.floor(Math.random() * images.length)];
