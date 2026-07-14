@@ -1284,7 +1284,7 @@ try {
           } else if (layer.id.includes('FONDO')) {
              state[layer.id] = images[Math.floor(Math.random() * images.length)];
           } else {
-             if (layer.id.includes('SOMBRERO') && Math.random() > 0.5) {
+             if ((layer.id.includes('SOMBRERO') || layer.id.includes('MANO_IZQUIERDA')) && Math.random() > 0.5) {
                state[layer.id] = "";
              } else {
                state[layer.id] = images[Math.floor(Math.random() * images.length)];
