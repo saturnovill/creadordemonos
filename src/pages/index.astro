@@ -11,7 +11,8 @@ const layerFolders = [
   '4_SOMBRERO',
   '5_OJOS',
   '6_BOCA',
-  '7_ACCESORIO'
+  '7_ACCESORIO',
+  '8_MANO_DERECHA'
 ];
 
 const baseColors = [
@@ -67,15 +68,24 @@ try {
       images: files.map(file => `/layers/${folder}/${file}`)
     };
   });
+  
+  const manoDerecha = availableLayers.find(l => l.id === '8_MANO_DERECHA');
+  if (manoDerecha) {
+    availableLayers.push({
+      id: '9_MANO_IZQUIERDA',
+      name: 'MANO_IZQUIERDA',
+      images: [...manoDerecha.images]
+    });
+  }
 } catch (e) {
   console.error("Error reading layers", e);
 }
 ---
 
-<Layout title="Creador de Personajes">
+<Layout title="Creador de monos">
   <main class="container">
     <header class="header">
-      <h1 class="title">Avatar Maker 🎨</h1>
+      <h1 class="title">Creador de monos 🎨</h1>
     </header>
     
     <div class="app-layout">
@@ -245,6 +255,26 @@ try {
                   </div>
                 </div>
               )}
+              {layer.id.includes('MANO_DERECHA') && (
+                <div class="transform-controls-section">
+                  <h3 class="color-picker-title">Ajustar Mano</h3>
+                  <div class="transform-controls">
+                    <button class="t-btn" id="mano-left" title="Izquierda">⬅️</button>
+                    <button class="t-btn" id="mano-right" title="Derecha">➡️</button>
+                    <button class="t-btn" id="mano-reset" title="Resetear">🔄</button>
+                  </div>
+                </div>
+              )}
+              {layer.id.includes('MANO_IZQUIERDA') && (
+                <div class="transform-controls-section">
+                  <h3 class="color-picker-title">Ajustar Mano Izquierda</h3>
+                  <div class="transform-controls">
+                    <button class="t-btn" id="mano-izq-left" title="Izquierda">⬅️</button>
+                    <button class="t-btn" id="mano-izq-right" title="Derecha">➡️</button>
+                    <button class="t-btn" id="mano-izq-reset" title="Resetear">🔄</button>
+                  </div>
+                </div>
+              )}
               {layer.id.includes('ACCESORIO') && (
                 <div style="margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
                   <!-- Active accessories management list -->
@@ -330,7 +360,7 @@ try {
   };
 
   // Initialize state based on available layers
-  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, selectedAccIdx: -1, ropaColor1: '#ffffff', ropaColor2: '#ffffff', bordeColorBOCA: '#000000', bordeColorOJOS: '#000000' };
+  const state = { baseColor: "#ffffff", baseColor2: "#cccccc", baseMode: "solid", bgMode: "image", bgColor1: "#ffffff", bgColor2: "#cccccc", bgPattern: 0, patternScale: 3, patternRotation: 0, patC1Mode: 'solid', patC1a: '#ffffff', patC1b: '#cccccc', patC2Mode: 'solid', patC2a: '#cccccc', patC2b: '#333333', hatOffsetX: 0, hatOffsetY: 0, hatRotation: 0, hatScale: 1, manoOffsetX: 0, manoIzqOffsetX: 0, selectedAccIdx: -1, ropaColor1: '#ffffff', ropaColor2: '#ffffff', bordeColorBOCA: '#000000', bordeColorOJOS: '#000000' };
   
   const parseTargetColors = (path) => {
     if (!path) return [];
@@ -372,7 +402,11 @@ try {
             matched = true;
           } else {
             // Check normalized match for anti-aliased edges
-            if (sT > 0 && sC > 0 && (sC / sT > 0.25)) {
+            // If target is grayscale, avoid aggressive normalized matching that would color all grays
+            const isTargetGrayscale = (Math.abs(tRgb.r - tRgb.g) < 10 && Math.abs(tRgb.g - tRgb.b) < 10);
+            const minBrightnessRatio = isTargetGrayscale ? 0.8 : 0.25;
+            
+            if (sT > 0 && sC > 0 && (sC / sT > minBrightnessRatio)) {
               const dr_n = r / sC - tRgb.r / sT;
               const dg_n = g / sC - tRgb.g / sT;
               const db_n = b / sC - tRgb.b / sT;
@@ -764,6 +798,38 @@ try {
               }
               ctx.restore();
             }
+          } else if (layer.id.includes('MANO_DERECHA') || layer.id.includes('MANO_IZQUIERDA')) {
+            const isIzquierda = layer.id.includes('MANO_IZQUIERDA');
+            const targets = parseTargetColors(imgPath);
+            let targetHex = '#00ff00'; // Default to replacing bright green
+            if (targets.length > 0) {
+              targetHex = targets[0]; // If there's a color in the filename, e.g. SODA_$f1d02b
+            }
+            
+            ctx.save();
+            const offsetX = isIzquierda ? state.manoIzqOffsetX : state.manoOffsetX;
+            ctx.translate(canvas.width / 2 + offsetX, canvas.height / 2);
+            if (isIzquierda) {
+              ctx.scale(-1, 1);
+            }
+            
+            if (targetHex.toLowerCase() !== state.baseColor.toLowerCase()) {
+              const offCanvas = document.createElement('canvas');
+              offCanvas.width = canvas.width;
+              offCanvas.height = canvas.height;
+              const offCtx = offCanvas.getContext('2d');
+              
+              offCtx.drawImage(imageCache[imgPath], 0, 0, canvas.width, canvas.height);
+              const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+              
+              replaceColorInData(imgData.data, offCanvas.width, offCanvas.height, [targetHex], [state.baseColor]);
+              
+              offCtx.putImageData(imgData, 0, 0);
+              ctx.drawImage(offCanvas, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+            } else {
+              ctx.drawImage(imageCache[imgPath], -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+            }
+            ctx.restore();
           } else if (layer.id.includes('BOCA') || layer.id.includes('OJOS')) {
             const isBoca = layer.id.includes('BOCA');
             const bordeColor = isBoca ? state.bordeColorBOCA : state.bordeColorOJOS;
@@ -1119,12 +1185,16 @@ try {
   document.getElementById('t-scale-up')?.addEventListener('click', () => { state.hatScale += scaleStep; drawAvatar(); });
   document.getElementById('t-scale-down')?.addEventListener('click', () => { state.hatScale = Math.max(0.1, state.hatScale - scaleStep); drawAvatar(); });
   document.getElementById('t-reset')?.addEventListener('click', () => { 
-    state.hatOffsetX = 0; 
-    state.hatOffsetY = 0; 
-    state.hatRotation = 0; 
-    state.hatScale = 1;
-    drawAvatar(); 
+    state.hatOffsetX = 0; state.hatOffsetY = 0; state.hatRotation = 0; state.hatScale = 1; drawAvatar(); 
   });
+  
+  document.getElementById('mano-left')?.addEventListener('click', () => { state.manoOffsetX -= moveStep; drawAvatar(); });
+  document.getElementById('mano-right')?.addEventListener('click', () => { state.manoOffsetX += moveStep; drawAvatar(); });
+  document.getElementById('mano-reset')?.addEventListener('click', () => { state.manoOffsetX = 0; drawAvatar(); });
+
+  document.getElementById('mano-izq-left')?.addEventListener('click', () => { state.manoIzqOffsetX -= moveStep; drawAvatar(); });
+  document.getElementById('mano-izq-right')?.addEventListener('click', () => { state.manoIzqOffsetX += moveStep; drawAvatar(); });
+  document.getElementById('mano-izq-reset')?.addEventListener('click', () => { state.manoIzqOffsetX = 0; drawAvatar(); });
 
 
 
@@ -1550,10 +1620,18 @@ try {
     transform-origin: center 25%;
   }
   [id="5_OJOS"] .option-item img {
-    transform: scale(2.6) translateY(-14%);
+    transform: scale(1.8) translate(-3%, -14%);
   }
   [id="6_BOCA"] .option-item img {
     transform: scale(2.8) translateY(-22%);
+  }
+  [id="8_MANO_DERECHA"] .option-item img {
+    transform: scale(2.2) translate(-15%, -5%);
+    transform-origin: 80% 80%;
+  }
+  [id="9_MANO_IZQUIERDA"] .option-item img {
+    transform: scaleX(-1) scale(2.2) translate(-15%, -5%);
+    transform-origin: 80% 80%;
   }
   
   .empty-option {
